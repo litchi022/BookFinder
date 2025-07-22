@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图书搜索系统</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .search-form {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .btn-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 30px;
+        }
+        .book-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+        .book-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .book-info {
+            margin-bottom: 5px;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .error {
+            color: #D8000C;
+            background-color: #FFD2D2;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .message {
+            color: #00529B;
+            background-color: #BDE5F8;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>图书搜索系统</h1>
+        
+        <div class="search-form">
+            <div class="form-group">
+                <label for="key1">关键词1</label>
+                <input type="text" id="key1" placeholder="输入关键词...">
+            </div>
+            
+            <div class="form-group">
+                <label for="key2">关键词2</label>
+                <input type="text" id="key2" placeholder="输入关键词...">
+            </div>
+            
+            <div class="form-group">
+                <label for="key3">关键词3</label>
+                <input type="text" id="key3" placeholder="输入关键词...">
+            </div>
+            
+            <div class="form-group">
+                <label for="key4">关键词4</label>
+                <input type="text" id="key4" placeholder="输入关键词...">
+            </div>
+            
+            <div class="form-group">
+                <label for="key5">关键词5</label>
+                <input type="text" id="key5" placeholder="输入关键词...">
+            </div>
+            
+            <div class="form-group">
+                <label for="sqlcount">结果数量限制</label>
+                <input type="number" id="sqlcount" value="10" min="1" max="100">
+            </div>
+        </div>
+        
+        <div class="btn-container">
+            <button id="searchBtn">搜索</button>
+            <button id="clearBtn">清空</button>
+        </div>
+        
+        <div id="error" class="error"></div>
+        <div id="message" class="message"></div>
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>正在搜索，请稍候...</p>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchBtn = document.getElementById('searchBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const resultsContainer = document.getElementById('results');
+            const loadingElement = document.getElementById('loading');
+            const errorElement = document.getElementById('error');
+            const messageElement = document.getElementById('message');
+            
+            // 搜索按钮点击事件
+            searchBtn.addEventListener('click', function() {
+                // 重置显示
+                resetDisplay();
+                
+                // 获取所有输入值
+                const key1 = document.getElementById('key1').value.trim();
+                const key2 = document.getElementById('key2').value.trim();
+                const key3 = document.getElementById('key3').value.trim();
+                const key4 = document.getElementById('key4').value.trim();
+                const key5 = document.getElementById('key5').value.trim();
+                const sqlcount = parseInt(document.getElementById('sqlcount').value);
+                
+                // 验证输入
+                if (!key1 && !key2 && !key3 && !key4 && !key5) {
+                    showError('请至少输入一个关键词');
+                    return;
+                }
+                
+                // 禁用按钮防止重复提交
+                searchBtn.disabled = true;
+                
+                // 显示加载状态
+                loadingElement.style.display = 'block';
+                
+                // 准备请求数据
+                const requestData = {
+                    key1: key1,
+                    key2: key2,
+                    key3: key3,
+                    key4: key4,
+                    key5: key5,
+                    sqlcount: sqlcount
+                };
+                
+                // 发送API请求
+                fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(errorData => {
+                            throw new Error(errorData.error || `服务器错误: ${response.status}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // 隐藏加载状态
+                    loadingElement.style.display = 'none';
+                    
+                    // 检查是否有消息
+                    if (data.message) {
+                        showMessage(data.message);
+                        if (data.results) {
+                            displayResults(data.results);
+                        } else {
+                            resultsContainer.innerHTML = '<p>没有找到匹配的图书。</p>';
+                        }
+                        return;
+                    }
+                    
+                    // 处理搜索结果
+                    if (Array.isArray(data)) {
+                        if (data.length === 0) {
+                            resultsContainer.innerHTML = '<p>没有找到匹配的图书。</p>';
+                        } else {
+                            displayResults(data);
+                        }
+                    } else {
+                        showError('返回数据格式错误');
+                    }
+                })
+                .catch(error => {
+                    showError(error.message || '请求失败，请稍后再试');
+                })
+                .finally(() => {
+                    // 恢复按钮状态
+                    searchBtn.disabled = false;
+                    loadingElement.style.display = 'none';
+                });
+            });
+            
+            // 清空按钮点击事件
+            clearBtn.addEventListener('click', function() {
+                document.getElementById('key1').value = '';
+                document.getElementById('key2').value = '';
+                document.getElementById('key3').value = '';
+                document.getElementById('key4').value = '';
+                document.getElementById('key5').value = '';
+                document.getElementById('sqlcount').value = '10';
+                resetDisplay();
+            });
+            
+            // 重置显示区域
+            function resetDisplay() {
+                resultsContainer.innerHTML = '';
+                errorElement.style.display = 'none';
+                messageElement.style.display = 'none';
+                loadingElement.style.display = 'none';
+            }
+            
+            // 显示错误信息
+            function showError(message) {
+                loadingElement.style.display = 'none';
+                errorElement.textContent = message;
+                errorElement.style.display = 'block';
+                // 滚动到错误消息
+                errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            // 显示提示信息
+            function showMessage(message) {
+                messageElement.textContent = message;
+                messageElement.style.display = 'block';
+            }
+            
+            // 显示搜索结果
+            function displayResults(books) {
+                if (!Array.isArray(books) || books.length === 0) {
+                    resultsContainer.innerHTML = '<p>没有找到匹配的图书。</p>';
+                    return;
+                }
+                
+                resultsContainer.innerHTML = `<h2>搜索结果 (共${books.length}条)</h2>`;
+                
+                books.forEach(book => {
+                    const bookCard = document.createElement('div');
+                    bookCard.className = 'book-card';
+                    
+                    // 构建图书信息HTML
+                    let bookHTML = `<div class="book-title">${book.book_name || '未命名图书'}</div>`;
+                    
+                    if (book.book_introduction) {
+                        const intro = book.book_introduction.length > 200 ? 
+                            book.book_introduction.substring(0, 200) + '...' : 
+                            book.book_introduction;
+                        bookHTML += `<div class="book-info"><strong>简介：</strong>${intro}</div>`;
+                    }
+                    
+                    if (book.keywords) {
+                        bookHTML += `<div class="book-info"><strong>关键词：</strong>${book.keywords}</div>`;
+                    }
+                    
+                    // 添加其他可能的字段
+                    for (const key in book) {
+                        if (!['book_name', 'book_introduction', 'keywords'].includes(key) && book[key]) {
+                            bookHTML += `<div class="book-info"><strong>${key}：</strong>${book[key]}</div>`;
+                        }
+                    }
+                    
+                    bookCard.innerHTML = bookHTML;
+                    resultsContainer.appendChild(bookCard);
+                });
+                
+                // 滚动到结果区域
+                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    </script>
+</body>
+</html> 
